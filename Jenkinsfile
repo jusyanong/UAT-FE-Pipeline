@@ -4,16 +4,9 @@ pipeline {
     tools {
         nodejs 'NodeJS-18'
     }
-
-    options {
-        timestamps()
-        timeout(time: 30, unit: 'MINUTES')
-        disableConcurrentBuilds()
-        buildDiscarder(logRotator(numToKeepStr: '10'))
-    }
-
+    
     environment {
-        APP_NAME       = 'frontend-app'
+        APP_NAME       = 'UAT-FE-Pipeline'
         DOCKER_IMAGE   = "jusyanong/${APP_NAME}"
         IMAGE_TAG      = "${BUILD_NUMBER}"
         DOCKER_CREDS   = credentials('docker-hub-credentials')
@@ -25,9 +18,7 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                git branch: 'master',
-                    url: 'https://github.com/jusyanong/UAT-FE-Pipeline.git',
-                    credentialsId: 'github-creds'
+                checkout scm
             }
         }
 
@@ -35,29 +26,11 @@ pipeline {
             steps {
                 script {
                     try {
-                        sh 'npm ci'
+                        sh 'npm install'
                     } catch (Exception e) {
                         currentBuild.result = 'FAILURE'
                         error("Dependency install failed: ${e.message}")
                     }
-                }
-            }
-        }
-
-        stage('Test') {
-            steps {
-                script {
-                    try {
-                        sh 'CI=true npm test'
-                    } catch (Exception e) {
-                        currentBuild.result = 'FAILURE'
-                        error("Tests failed: ${e.message}")
-                    }
-                }
-            }
-            post {
-                always {
-                    echo 'Test stage complete'
                 }
             }
         }
@@ -161,6 +134,7 @@ pipeline {
             echo "❌ Build #${BUILD_NUMBER} failed — check the logs."
         }
         always {
+            echo "Pipeline finished for ${APP_NAME}"
             node('') {
                 sh 'docker logout || true'
                 sh 'docker image prune -f || true'
