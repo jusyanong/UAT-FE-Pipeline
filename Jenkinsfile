@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     tools {
-        nodejs 'NodeJS-18'   // must match the name set in Manage Jenkins → Tools
+        nodejs 'NodeJS-18'
     }
 
     options {
@@ -12,10 +12,21 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '10'))
     }
 
+    environment {
+        APP_NAME       = 'frontend-app'
+        DOCKER_IMAGE   = "jusyanong/${APP_NAME}"
+        IMAGE_TAG      = "${BUILD_NUMBER}"
+        DOCKER_CREDS   = credentials('docker-hub-credentials')
+        CONTAINER_PORT = '80'
+        HOST_PORT      = '80'
+    }
+
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'master', url: 'https://github.com/jusyanong/UAT-FE-Pipeline.git'
+                git branch: 'master',
+                    url: 'https://github.com/jusyanong/UAT-FE-Pipeline.git',
+                    credentialsId: 'github-creds'
             }
         }
 
@@ -23,7 +34,7 @@ pipeline {
             steps {
                 script {
                     try {
-                        sh 'npm install'
+                        sh 'npm ci'
                     } catch (Exception e) {
                         currentBuild.result = 'FAILURE'
                         error("Dependency install failed: ${e.message}")
@@ -32,27 +43,112 @@ pipeline {
             }
         }
 
-        stage('Build') {
+        stage('Test') {
+            steps {
+                script {
+                    try {
+                        // CI=true prevents interactive watch mode in React
+                        sh 'CI=true npm test'
+                    } catch (Exception e) {
+                        currentBuild.result = 'FAILURE'
+                        error("Tests failed: ${e.message}")
+                    }
+                }
+            }
+            post {
+                always {
+                    // junit '**/test-results/*.xml'
+                    echo 'Test stage complete'
+                }
+            }
+        }
+
+        stage('Build Frontend') {
             steps {
                 script {
                     try {
                         sh 'npm run build'
                     } catch (Exception e) {
                         currentBuild.result = 'FAILURE'
-                        error("Build failed: ${e.message}")
+                        error("Frontend build failed: ${e.message}")
                     }
                 }
             }
         }
 
-        stage('Run Tests') {
+        stage('Build Docker Image') {
             steps {
                 script {
                     try {
-                        sh 'npm test'
+                        sh """
+                            docker build \
+                                -t ${DOCKER_IMAGE}:${IMAGE_TAG} \
+                                -t ${DOCKER_IMAGE}:latest \
+                                .
+                        """
                     } catch (Exception e) {
                         currentBuild.result = 'FAILURE'
-                        error("Tests failed: ${e.message}")
+                        error("Docker build failed: ${e.message}")
+                    }
+                }
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                script {
+                    try {
+                        sh """
+                            echo ${DOCKER_CREDS_PSW} | \
+                            docker login -u ${DOCKER_CREDS_USR} --password-stdin
+                            docker push ${DOCKER_IMAGE}:${IMAGE_TAG}
+                            docker push ${DOCKER_IMAGE}:latest
+                        """
+                    } catch (Exception e) {
+                        currentBuild.result = 'FAILURE'
+                        error("Docker push failed: ${e.message}")
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Container') {
+            steps {
+                script {
+                    try {
+                        sh """
+                            # stop and remove existing container if running
+                            docker stop ${APP_NAME} || true
+                            docker rm ${APP_NAME} || true
+
+                            # pull and run latest image
+                            docker pull ${DOCKER_IMAGE}:${IMAGE_TAG}
+                            docker run -d \
+                                --name ${APP_NAME} \
+                                --restart always \
+                                -p ${HOST_PORT}:${CONTAINER_PORT} \
+                                ${DOCKER_IMAGE}:${IMAGE_TAG}
+                        """
+                    } catch (Exception e) {
+                        currentBuild.result = 'FAILURE'
+                        error("Deployment failed: ${e.message}")
+                    }
+                }
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                script {
+                    try {
+                        sh 'sleep 5'
+                        sh """
+                            docker ps | grep ${APP_NAME}
+                            docker logs ${APP_NAME} --tail=20
+                        """
+                    } catch (Exception e) {
+                        currentBuild.result = 'FAILURE'
+                        error("Verification failed: ${e.message}")
                     }
                 }
             }
@@ -62,63 +158,18 @@ pipeline {
     post {
         success {
             echo "✅ Build #${BUILD_NUMBER} deployed successfully!"
+            echo "🐳 Running as: ${DOCKER_IMAGE}:${IMAGE_TAG}"
         }
         failure {
             echo "❌ Build #${BUILD_NUMBER} failed — check the logs."
+            // rollback to previous image
+            sh "docker stop ${APP_NAME} || true"
+            sh "docker run -d --name ${APP_NAME} --restart always -p ${HOST_PORT}:${CONTAINER_PORT} ${DOCKER_IMAGE}:latest || true"
         }
         always {
+            sh 'docker logout || true'
+            sh 'docker image prune -f || true'
             cleanWs()
         }
     }
 }
-
-
-// pipeline {
-//     agent any
-    
-//     environment {
-//         DOCKER_CREDENTIALS = credentials('docker-hub-credentials')
-//     }
-    
-//     stages {
-//         stage('Checkout') {
-//             steps {
-//                 git branch: 'main', url: 'https://github.com/yourusername/your-repo.git'
-//             }
-//         }
-        
-//         stage('Install Dependencies') {
-//             steps {
-//                 sh 'npm install'
-//             }
-//         }
-        
-//         stage('Run Tests') {
-//             steps {
-//                 sh 'npm test'
-//             }
-//         }
-        
-//         stage('Build Docker Image') {
-//             steps {
-//                 sh 'docker build -t yourusername/your-app:latest .'
-//             }
-//         }
-        
-//         stage('Push to Docker Hub') {
-//             steps {
-//                 sh 'echo $DOCKER_CREDENTIALS_PSW | docker login -u $DOCKER_CREDENTIALS_USR --password-stdin'
-//                 sh 'docker push yourusername/your-app:latest'
-//             }
-//         }
-//     }
-    
-//     post {
-//     success {
-//         echo "✅ Build #${BUILD_NUMBER} deployed successfully!"
-//     }
-//     failure {
-//         echo "❌ Build #${BUILD_NUMBER} failed — check the logs."
-//         }
-//     }
-// }
