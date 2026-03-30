@@ -135,9 +135,6 @@ pipeline {
         }
         always {
             echo "Pipeline finished for ${APP_NAME}"
-        }
-        always {
-            echo "Pipeline finished for ${APP_NAME}"
             // "Magic" line that clears space after every build
             sh 'docker system prune -f'
         }
