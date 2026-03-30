@@ -1,6 +1,12 @@
 pipeline {
     agent any
 
+    // 1. ADD PARAMETERS BLOCK
+    parameters {
+        choice(name: 'Environment', choices: ['Staging', 'Production'], description: 'Select the environment to deploy to')
+        string(name: 'BRANCH', defaultValue: 'master', description: 'GitHub branch to use')
+    }
+
     tools {
         nodejs 'NodeJS-18'
     }
@@ -10,140 +16,85 @@ pipeline {
         DOCKER_IMAGE   = "jusyanong/${APP_NAME}"
         IMAGE_TAG      = "${BUILD_NUMBER}"
         DOCKER_CREDS   = credentials('docker-hub-credentials')
-        CONTAINER_PORT = '80'
-        HOST_PORT      = '80'
+        
+        // 2. DEFINE ENVIRONMENT SPECIFICS
+        // You can change these ports if you want Staging on 3002 and Prod on 80
+        STAGING_PORT   = ''
+        PROD_PORT      = '3002'
+        
+        // 3. ADD SSH CREDENTIALS (ID from Jenkins Credentials Provider)
+        // This is needed if your Jenkins is on a different server than your App
+        EC2_CREDS      = credentials('aws-ec2-ssh-key') 
     }
 
     stages {
-
         stage('Checkout') {
             steps {
-                checkout scm
+                // Uses the branch from your parameter
+                git branch: "${params.BRANCH}", url: 'https://github.com/jusyanong/jusyanong-cicd.git'
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Install & Build') {
             steps {
                 script {
-                    try {
-                        sh 'npm install'
-                    } catch (Exception e) {
-                        currentBuild.result = 'FAILURE'
-                        error("Dependency install failed: ${e.message}")
-                    }
+                    sh 'npm install'
+                    sh 'npm run build'
                 }
             }
         }
 
-        stage('Build Frontend') {
+        stage('Docker Build & Push') {
             steps {
                 script {
-                    try {
-                        sh 'npm run build'
-                    } catch (Exception e) {
-                        currentBuild.result = 'FAILURE'
-                        error("Frontend build failed: ${e.message}")
-                    }
+                    sh "docker build -t ${DOCKER_IMAGE}:${IMAGE_TAG} -t ${DOCKER_IMAGE}:latest ."
+                    sh "echo \$DOCKER_CREDS_PSW | docker login -u \$DOCKER_CREDS_USR --password-stdin"
+                    sh "docker push ${DOCKER_IMAGE}:${IMAGE_TAG}"
+                    sh "docker push ${DOCKER_IMAGE}:latest"
                 }
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Deploy to Environment') {
             steps {
                 script {
-                    try {
-                        sh """
-                            docker build \\
-                                -t ${DOCKER_IMAGE}:${IMAGE_TAG} \\
-                                -t ${DOCKER_IMAGE}:latest \\
-                                .
-                        """
-                    } catch (Exception e) {
-                        currentBuild.result = 'FAILURE'
-                        error("Docker build failed: ${e.message}")
-                    }
-                }
-            }
-        }
+                    // 4. DYNAMIC LOGIC BASED ON PARAMETER
+                    def targetPort = params.Environment == 'Production' ? env.PROD_PORT : env.STAGING_PORT
+                    echo "🚀 Deploying to ${params.TARGET_ENV} on Port ${targetPort}..."
 
-        stage('Push to Docker Hub') {
-            steps {
-                script {
                     try {
-                        sh """
-                            echo \$DOCKER_CREDS_PSW | \\
-                            docker login -u \$DOCKER_CREDS_USR --password-stdin
-                            docker push ${DOCKER_IMAGE}:${IMAGE_TAG}
-                            docker push ${DOCKER_IMAGE}:latest
-                        """
-                    } catch (Exception e) {
-                        currentBuild.result = 'FAILURE'
-                        error("Docker push failed: ${e.message}")
-                    }
-                }
-            }
-        }
-
-        stage('Deploy Container') {
-            steps {
-                script {
-                    try {
-                        // 1. Find and kill ANY container currently using port 80
-                        echo "Cleaning up any container using Port 80..."
-                        sh "docker rm -f \$(docker ps -q --filter 'publish=80') || true"
-
-                        // 2. Standard cleanup for your specific app name just in case
+                        // Cleanup existing container
                         sh "docker stop ${APP_NAME} || true"
                         sh "docker rm ${APP_NAME} || true"
 
-                        // 3. Pull and Run
-                        sh "docker pull ${DOCKER_IMAGE}:${IMAGE_TAG}"
+                        // Run new container
                         sh """
                             docker run -d \
                                 --name ${APP_NAME} \
                                 --restart always \
-                                -p ${HOST_PORT}:${CONTAINER_PORT} \
+                                -p ${targetPort}:80 \
                                 ${DOCKER_IMAGE}:${IMAGE_TAG}
                         """
                     } catch (Exception e) {
-                        error("Deployment failed: ${e.message}")
-            }
-        }
-    }
-}
-
-        stage('Verify Deployment') {
-            steps {
-                script {
-                    try {
-                        sh 'sleep 5'
-                        sh """
-                            docker ps | grep ${APP_NAME}
-                            docker logs ${APP_NAME} --tail=20
-                        """
-                    } catch (Exception e) {
-                        currentBuild.result = 'FAILURE'
-                        error("Verification failed: ${e.message}")
+                        error("Deployment to ${params.TARGET_ENV} failed: ${e.message}")
                     }
                 }
             }
         }
 
+        stage('Verify') {
+            steps {
+                sh "docker ps | grep ${APP_NAME}"
+            }
+        }
     }
 
     post {
         success {
-            echo "✅ Build #${BUILD_NUMBER} deployed successfully!"
-            echo "🐳 Running as: ${DOCKER_IMAGE}:${IMAGE_TAG}"
-        }
-        failure {
-            echo "❌ Build #${BUILD_NUMBER} failed — check the logs."
+            echo "✅ Successfully deployed to ${params.TARGET_ENV}!"
         }
         always {
-            echo "Pipeline finished for ${APP_NAME}"
-            // "Magic" line that clears space after every build
             sh 'docker system prune -f'
         }
     }
-
 }
