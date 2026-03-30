@@ -278,7 +278,7 @@ function App() {
         <div className="repos-section">
 
           <a
-            href="https://github.com/jusyanong/UAT-FE-Pipeline"
+            href="https://github.com/jusyanong/jusyanong-cicd.git"
             target="_blank"
             rel="noreferrer"
             className="repo-card"
