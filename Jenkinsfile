@@ -88,23 +88,29 @@ pipeline {
             steps {
                 script {
                     try {
+                        // 1. Find and kill ANY container currently using port 80
+                        echo "Cleaning up any container using Port 80..."
+                        sh "docker rm -f \$(docker ps -q --filter 'publish=80') || true"
+
+                        // 2. Standard cleanup for your specific app name just in case
+                        sh "docker stop ${APP_NAME} || true"
+                        sh "docker rm ${APP_NAME} || true"
+
+                        // 3. Pull and Run
+                        sh "docker pull ${DOCKER_IMAGE}:${IMAGE_TAG}"
                         sh """
-                            docker stop ${APP_NAME} || true
-                            docker rm ${APP_NAME} || true
-                            docker pull ${DOCKER_IMAGE}:${IMAGE_TAG}
-                            docker run -d \\
-                                --name ${APP_NAME} \\
-                                --restart always \\
-                                -p ${HOST_PORT}:${CONTAINER_PORT} \\
+                            docker run -d \
+                                --name ${APP_NAME} \
+                                --restart always \
+                                -p ${HOST_PORT}:${CONTAINER_PORT} \
                                 ${DOCKER_IMAGE}:${IMAGE_TAG}
                         """
                     } catch (Exception e) {
-                        currentBuild.result = 'FAILURE'
                         error("Deployment failed: ${e.message}")
-                    }
-                }
             }
         }
+    }
+}
 
         stage('Verify Deployment') {
             steps {
