@@ -6,7 +6,7 @@ pipeline {
     }
     
     environment {
-        APP_NAME       = 'uat-fe-pipeline'
+        APP_NAME       = 'jusyanong-cicd'
         DOCKER_IMAGE   = "jusyanong/${APP_NAME}"
         IMAGE_TAG      = "${BUILD_NUMBER}"
         DOCKER_CREDS   = credentials('docker-hub-credentials')
