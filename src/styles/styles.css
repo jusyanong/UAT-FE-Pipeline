@@ -295,18 +295,30 @@ section {
 
 /* ── ARCHITECTURE ── */
 .arch-box {
-  background: var(--card);
-  border: 1px solid var(--border);
+  background-color: #0d1117; /* GitHub Dark Theme Background */
+  padding: 2rem;
   border-radius: 12px;
-  padding: 3rem;
-  font-family: 'Courier New', monospace;
-  font-size: 0.82rem;
-  line-height: 2;
-  color: var(--muted);
+  border: 1px solid #30363d;
   overflow-x: auto;
 }
 
-.arch-box pre { white-space: pre; }
+.arch-box pre {
+  margin: 0;
+  /* Use fonts designed for coding */
+  font-family: 'Fira Code', 'Courier New', Courier, monospace; 
+  font-size: 14px;
+  line-height: 1.2;
+  /* Disable any ligatures that might merge characters */
+  font-variant-ligatures: none; 
+}
+
+
+/* Color Palette */
+.text-white   { color: #f0f6fc; }
+.text-muted   { color: #8b949e; } /* Gray connectors */
+.text-info    { color: #58a6ff; } /* GitHub Blue */
+.text-warning { color: #d29922; } /* Jenkins/Gold */
+.text-success { color: #3fb950; } /* Docker/Live Green */
 
 /* ── TECH STACK ── */
 .tech-grid {

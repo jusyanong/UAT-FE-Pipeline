@@ -190,43 +190,70 @@ function App() {
         <p className="section-label">System Design</p>
         <h2 className="section-title">Architecture</h2>
         <div className="arch-box">
-          <pre>{`  ┌─────────────────────────────────────────────────────────┐
+  <pre>
+    <span className="text-white">
+{`
+  ┌─────────────────────────────────────────────────────────┐
   │                    DEVELOPER MACHINE                    │
-  └──────────────────────────┬──────────────────────────────┘
+  └──────────────────────────┬──────────────────────────────┘`}</span>
+    <span className="text-muted">
+{`
+
                              │  git push
-                             ▼
+                             
+                             ▼`}</span>
+    <span className="text-info">
+{`
   ┌─────────────────────────────────────────────────────────┐
   │                    GITHUB REPOSITORY                    │
   │              Jenkinsfile + React Source Code            │
-  └──────────────────────────┬──────────────────────────────┘
+  └──────────────────────────┬──────────────────────────────┘`}</span>
+    <span className="text-warning">
+{`
+
                              │  webhook trigger
+                             
                              ▼
   ┌─────────────────────────────────────────────────────────┐
-  │               EC2 INSTANCE 1 — JENKINS                 │
+  │               EC2 INSTANCE 1 — JENKINS                  │
   │                                                         │
-  │   Checkout → Install → Build → Docker Build → Push     │
-  │                    → Deploy → Verify                   │
+  │   Checkout → Install → Build → Docker Build → Push      │
+  │                    → Deploy → Verify                    │
   │                                                         │
   │   Port: 8080          Exposes: /prometheus/ metrics     │
-  └──────────────┬──────────────────────┬───────────────────┘
-                │  docker push          │  metrics scrape
+  └─────────────┬────────────────────── ┬───────────────────┘
+  `}</span>
+    <span className="text-success">
+{`
+                │                       │
+
+          docker push            metrics scrape
                 ▼                       ▼
   ┌──────────────────┐    ┌───────────────────────────────────┐
   │   DOCKER HUB     │    │   EC2 INSTANCE 2 — MONITORING     │
   │                  │    │                                   │
   │  Image Registry  │    │   Prometheus  →  Grafana          │
   │  versioned tags  │    │   Port: 9090      Port: 3001      │
-  └──────────────────┘    └───────────────────────────────────┘
+  └──────────────────┘    └───────────────────────────────────┘`
+  }</span>
+    <span className="text-muted">
+{`     
                 │
+
                 │  docker pull
-                ▼
+
+                ▼`
+                }</span>
+    <span className="text-success">
+{`
   ┌─────────────────────────────────────────────────────────┐
-  │               REACT APP — LIVE ON EC2                  │
+  │               REACT APP — LIVE ON EC2                   │
   │         Served via Nginx inside Docker container        │
-  │                      Port: 80                          │
-  └─────────────────────────────────────────────────────────┘`}
-          </pre>
-        </div>
+  │                      Port: 80                           │
+  └─────────────────────────────────────────────────────────┘`
+  }</span>
+  </pre>
+</div>
       </section>
 
       <div className="divider" />
@@ -285,7 +312,7 @@ function App() {
           >
             <span className="repo-icon">📦</span>
             <div className="repo-info">
-              <div className="repo-name">UAT-FE-Pipeline</div>
+              <div className="repo-name">jusyanong-cicd</div>
               <div className="repo-desc">Jenkins CI/CD pipeline for React frontend with Docker deployment on AWS EC2</div>
             </div>
             <span className="repo-arrow">→</span>
@@ -332,7 +359,7 @@ function App() {
 
       {/* ── FOOTER ── */}
       <footer>
-        <p>Built by <span>Justine Yanong</span> · CI/CD Pipeline Project · 2026</p>
+        <p>Built by <span>Justine Miguel Yanong</span> · CI/CD Pipeline Project · 2026</p>
         <p style={{ marginTop: '0.5rem' }}>Jenkins · Docker · AWS EC2 · React · Prometheus · Grafana</p>
       </footer>
 

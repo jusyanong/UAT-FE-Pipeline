@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App'; // This imports your portfolio code from App.js
-import './styles/styles.css';    // This imports your portfolio CSS
+import App from './app.js'; 
+import './styles/styles.css'; 
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
